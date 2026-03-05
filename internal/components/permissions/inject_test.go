@@ -9,11 +9,17 @@ import (
 
 	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/cursor"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/gemini"
 	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/vscode"
 )
 
 func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
 func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
+func geminiAdapter() agents.Adapter   { return gemini.NewAdapter() }
+func cursorAdapter() agents.Adapter   { return cursor.NewAdapter() }
+func vscodeAdapter() agents.Adapter   { return vscode.NewAdapter() }
 
 func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 	home := t.TempDir()
@@ -94,4 +100,119 @@ func TestInjectAddsEnvToDenyList(t *testing.T) {
 	}
 
 	t.Fatalf("deny list missing explicit .env rule: %#v", denyList)
+}
+
+func TestInjectClaudeCodeUsesBypassPermissions(t *testing.T) {
+	home := t.TempDir()
+
+	if _, err := Inject(home, claudeAdapter()); err != nil {
+		t.Fatalf("Inject() error = %v", err)
+	}
+
+	settingsPath := filepath.Join(home, ".claude", "settings.json")
+	content, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("read settings file: %v", err)
+	}
+
+	var settings map[string]any
+	if err := json.Unmarshal(content, &settings); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	perms, ok := settings["permissions"].(map[string]any)
+	if !ok {
+		t.Fatalf("permissions node missing")
+	}
+
+	mode, ok := perms["defaultMode"].(string)
+	if !ok || mode != "bypassPermissions" {
+		t.Fatalf("expected defaultMode=bypassPermissions, got %q", mode)
+	}
+}
+
+func TestInjectGeminiCLIUsesYoloMode(t *testing.T) {
+	home := t.TempDir()
+
+	result, err := Inject(home, geminiAdapter())
+	if err != nil {
+		t.Fatalf("Inject() error = %v", err)
+	}
+	if !result.Changed {
+		t.Fatal("Inject() changed = false")
+	}
+
+	settingsPath := filepath.Join(home, ".gemini", "settings.json")
+	content, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("read settings file: %v", err)
+	}
+
+	var settings map[string]any
+	if err := json.Unmarshal(content, &settings); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	general, ok := settings["general"].(map[string]any)
+	if !ok {
+		t.Fatalf("general node missing: %#v", settings)
+	}
+
+	mode, ok := general["defaultApprovalMode"].(string)
+	if !ok || mode != "yolo" {
+		t.Fatalf("expected defaultApprovalMode=yolo, got %q", mode)
+	}
+
+	// Ensure no Claude Code keys leaked
+	if _, exists := settings["permissions"]; exists {
+		t.Fatal("gemini settings should not contain 'permissions' key")
+	}
+}
+
+func TestInjectVSCodeCopilotUsesAutoApprove(t *testing.T) {
+	home := t.TempDir()
+
+	result, err := Inject(home, vscodeAdapter())
+	if err != nil {
+		t.Fatalf("Inject() error = %v", err)
+	}
+	if !result.Changed {
+		t.Fatal("Inject() changed = false")
+	}
+
+	settingsPath := filepath.Join(home, ".vscode", "settings.json")
+	content, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("read settings file: %v", err)
+	}
+
+	var settings map[string]any
+	if err := json.Unmarshal(content, &settings); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	autoApprove, ok := settings["chat.tools.autoApprove"].(bool)
+	if !ok || !autoApprove {
+		t.Fatalf("expected chat.tools.autoApprove=true, got %v", settings["chat.tools.autoApprove"])
+	}
+
+	// Ensure no Claude Code keys leaked
+	if _, exists := settings["permissions"]; exists {
+		t.Fatal("vscode settings should not contain 'permissions' key")
+	}
+}
+
+func TestInjectCursorSkipsPermissions(t *testing.T) {
+	home := t.TempDir()
+
+	result, err := Inject(home, cursorAdapter())
+	if err != nil {
+		t.Fatalf("Inject() error = %v", err)
+	}
+	if result.Changed {
+		t.Fatal("Inject() for Cursor should not change anything (permissions via cli-config.json)")
+	}
+	if len(result.Files) != 0 {
+		t.Fatalf("Inject() for Cursor should return no files, got %v", result.Files)
+	}
 }
