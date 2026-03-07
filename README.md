@@ -28,7 +28,7 @@
 <a href="https://github.com/Gentleman-Programming/gentle-ai/releases"><img src="https://img.shields.io/github/v/release/Gentleman-Programming/gentle-ai" alt="Release"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go&logoColor=white" alt="Go 1.24+">
-<img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey" alt="Platform">
+<img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="Platform">
 </p>
 
 </div>
@@ -74,8 +74,16 @@ This is NOT an AI agent installer. Most agents are easy to install. This is an *
 
 ## Quick Start
 
+### macOS / Linux
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.sh | bash
+```
+
+### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.ps1 | iex
 ```
 
 This downloads the latest release for your platform and launches the interactive TUI. No Go toolchain required.
@@ -94,6 +102,16 @@ brew install gentle-ai
 ### Go install (any platform with Go 1.24+)
 
 ```bash
+go install github.com/gentleman-programming/gentle-ai/cmd/gentle-ai@latest
+```
+
+### Windows (PowerShell)
+
+```powershell
+# Option 1: PowerShell installer (downloads binary from GitHub Releases)
+irm https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.ps1 | iex
+
+# Option 2: Go install (requires Go 1.24+)
 go install github.com/gentleman-programming/gentle-ai/cmd/gentle-ai@latest
 ```
 
@@ -247,7 +265,7 @@ gentle-ai install --dry-run \
 
 - **Detected tools**: git, curl, node, npm, brew, go
 - **Version checks**: validates minimum versions where applicable
-- **Platform-aware hints**: suggests `brew install`, `apt install`, or `pacman -S` depending on your OS
+- **Platform-aware hints**: suggests `brew install`, `apt install`, `pacman -S`, or `winget install` depending on your OS
 - **Dependency-first approach**: detects what's installed, calculates what's needed, shows the full dependency tree before installing anything, then verifies each dependency after installation
 
 ---
@@ -259,10 +277,20 @@ gentle-ai install --dry-run \
 | macOS (Apple Silicon + Intel) | Homebrew | Supported |
 | Linux (Ubuntu/Debian) | apt | Supported |
 | Linux (Arch) | pacman | Supported |
+| Windows 10/11 | winget | Supported |
 
 Derivatives are detected via `ID_LIKE` in `/etc/os-release` (Linux Mint, Pop!_OS, Manjaro, EndeavourOS, etc.).
 
-Release binaries are built for `linux` and `darwin` on both `amd64` and `arm64`.
+Release binaries are built for `linux`, `darwin`, and `windows` on both `amd64` and `arm64`.
+
+### Windows Notes
+
+- **winget** is used as the default package manager (pre-installed on Windows 10/11).
+- **npm global installs** do not require `sudo` on Windows (user-writable by default).
+- **curl** is pre-installed on Windows 10+ and does not require separate installation.
+- **PowerShell** is the default shell when `$SHELL` is not set.
+- VS Code Copilot config is resolved via `%APPDATA%\Code\User\`.
+- Release archives use `.zip` format on Windows (`.tar.gz` on macOS/Linux).
 
 ---
 
@@ -289,7 +317,7 @@ internal/
   verify/                  Post-apply health checks + reporting
   tui/                     Bubbletea TUI (Rose Pine theme)
     styles/  screens/
-scripts/                   Curl installer script
+scripts/                   Installer scripts (bash + PowerShell)
 e2e/                       Docker-based E2E tests (Ubuntu + Arch)
 testdata/                  Golden test fixtures
 ```
@@ -305,8 +333,11 @@ go test ./...
 # Docker E2E (Ubuntu + Arch, requires Docker)
 RUN_FULL_E2E=1 RUN_BACKUP_TESTS=1 ./e2e/docker-test.sh
 
-# Dry-run smoke test
+# Dry-run smoke test (macOS/Linux)
 gentle-ai install --dry-run --agent claude-code --preset minimal
+
+# Dry-run smoke test (Windows PowerShell)
+gentle-ai.exe install --dry-run --agent claude-code --preset minimal
 ```
 
 Test coverage:
